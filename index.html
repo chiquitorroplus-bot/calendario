@@ -1,0 +1,397 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<title>Calendario Gantt</title>
+
+<style>
+
+body{
+font-family:system-ui;
+background:#f4f4f4;
+padding:20px;
+}
+
+h1{
+margin-top:0;
+}
+
+.controls{
+display:flex;
+gap:10px;
+margin-bottom:10px;
+align-items:center;
+}
+
+button{
+padding:6px 10px;
+cursor:pointer;
+}
+
+.calendar{
+border-collapse:collapse;
+width:100%;
+table-layout:fixed;
+background:white;
+}
+
+.calendar th,.calendar td{
+border:1px solid #ddd;
+height:90px;
+vertical-align:top;
+position:relative;
+padding:3px;
+}
+
+.calendar th{
+background:#fafafa;
+}
+
+.day{
+position:absolute;
+top:3px;
+right:4px;
+font-size:11px;
+font-weight:600;
+}
+
+.festivo{
+background:#ffeaea;
+}
+
+.festivoNombre{
+font-size:9px;
+color:#a00;
+margin-top:12px;
+}
+
+.ganttBar{
+position:absolute;
+bottom:4px;
+left:0;
+right:0;
+height:10px;
+background:#1976d2;
+border-radius:3px;
+}
+
+.ganttBar.nr{
+background:#388e3c;
+}
+
+details{
+background:white;
+padding:10px;
+margin-top:10px;
+border-radius:6px;
+box-shadow:0 1px 4px rgba(0,0,0,0.1);
+}
+
+input{
+margin:4px;
+}
+
+.task{
+font-size:12px;
+margin:3px 0;
+}
+
+</style>
+</head>
+
+<body>
+
+<h1>Calendario Gantt</h1>
+
+<div class="controls">
+
+<button id="prev">◀</button>
+<button id="today">Hoy</button>
+<button id="next">▶</button>
+
+<div id="titulo"></div>
+
+</div>
+
+<table class="calendar">
+
+<thead>
+<tr>
+<th>Lunes</th>
+<th>Martes</th>
+<th>Miércoles</th>
+<th>Jueves</th>
+<th>Viernes</th>
+<th>Sábado</th>
+<th>Domingo</th>
+</tr>
+</thead>
+
+<tbody id="body"></tbody>
+
+</table>
+
+<details>
+
+<summary><b>Tareas recurrentes</b></summary>
+
+<div>
+
+<label>Tarea</label>
+<input id="recNombre">
+
+<label>Día inicio (día hábil del mes)</label>
+<input type="number" id="recInicio">
+
+<label>Duración en días</label>
+<input type="number" id="recDur">
+
+<button id="addRec">Añadir</button>
+
+<div id="listaRec"></div>
+
+</div>
+
+</details>
+
+<details>
+
+<summary><b>Tareas no recurrentes</b></summary>
+
+<div>
+
+<label>Tarea</label>
+<input id="nrNombre">
+
+<label>Día inicio</label>
+<input type="number" id="nrInicio">
+
+<label>Duración en días</label>
+<input type="number" id="nrDur">
+
+<button id="addNr">Añadir</button>
+
+<div id="listaNr"></div>
+
+</div>
+
+</details>
+
+<details>
+
+<summary><b>Festivos personalizados</b></summary>
+
+<label>Nombre</label>
+<input id="festNombre">
+
+<label>Día</label>
+<input type="number" id="festDia">
+
+<button id="addFest">Añadir</button>
+
+<div id="listaFest"></div>
+
+</details>
+
+<script>
+
+let hoy=new Date()
+
+let mes=hoy.getMonth()
+let anio=hoy.getFullYear()
+
+let rec=JSON.parse(localStorage.getItem("rec")||"[]")
+let nr=JSON.parse(localStorage.getItem("nr")||"[]")
+let festExtra=JSON.parse(localStorage.getItem("fest")||"[]")
+
+const meses=["Enero","Febrero","Marzo","Abril","Mayo","Junio","Julio","Agosto","Septiembre","Octubre","Noviembre","Diciembre"]
+
+function save(){
+localStorage.setItem("rec",JSON.stringify(rec))
+localStorage.setItem("nr",JSON.stringify(nr))
+localStorage.setItem("fest",JSON.stringify(festExtra))
+}
+
+function festivosMX(a,m){
+
+let f=[
+{d:1,m:0,n:"Año Nuevo"},
+{d:1,m:4,n:"Día del Trabajo"},
+{d:16,m:8,n:"Independencia"},
+{d:25,m:11,n:"Navidad"}
+]
+
+function nthMonday(n,month){
+
+let d=new Date(a,month,1)
+
+while(d.getDay()!=1)d.setDate(d.getDate()+1)
+
+d.setDate(d.getDate()+7*(n-1))
+
+return d.getDate()
+
+}
+
+if(m==1)f.push({d:nthMonday(1,1),m:1,n:"Constitución"})
+if(m==2)f.push({d:nthMonday(3,2),m:2,n:"Benito Juárez"})
+if(m==10)f.push({d:nthMonday(3,10),m:10,n:"Revolución"})
+
+return f.filter(x=>x.m==m)
+
+}
+
+function esLaboral(d,fest){
+
+let wd=d.getDay()
+
+if(wd==0||wd==6)return false
+
+return !fest.some(f=>f.d==d.getDate())
+
+}
+
+function diasHabilesMes(a,m,fest){
+
+let list=[]
+
+let last=new Date(a,m+1,0)
+
+for(let d=1;d<=last.getDate();d++){
+
+let date=new Date(a,m,d)
+
+if(esLaboral(date,fest))list.push(d)
+
+}
+
+return list
+
+}
+
+function generar(){
+
+let fest=festivosMX(anio,mes).concat(festExtra)
+
+document.getElementById("titulo").innerText=meses[mes]+" "+anio
+
+let body=document.getElementById("body")
+
+body.innerHTML=""
+
+let first=new Date(anio,mes,1)
+
+let start=new Date(first)
+
+while(start.getDay()!=1){
+
+start.setDate(start.getDate()-1)
+
+}
+
+let habiles=diasHabilesMes(anio,mes,fest)
+
+for(let w=0;w<6;w++){
+
+let tr=document.createElement("tr")
+
+for(let d=0;d<7;d++){
+
+let td=document.createElement("td")
+
+let date=new Date(start)
+
+date.setDate(start.getDate()+w*7+d)
+
+let num=date.getDate()
+
+if(date.getMonth()==mes){
+
+let div=document.createElement("div")
+div.className="day"
+div.innerText=num
+td.appendChild(div)
+
+let festivo=fest.find(f=>f.d==num)
+
+if(festivo){
+
+td.classList.add("festivo")
+
+let fn=document.createElement("div")
+fn.className="festivoNombre"
+fn.innerText=festivo.n
+td.appendChild(fn)
+
+}
+
+}
+
+tr.appendChild(td)
+
+}
+
+body.appendChild(tr)
+
+}
+
+renderLists()
+
+save()
+
+}
+
+function renderLists(){
+
+listaRec.innerHTML=rec.map((t,i)=>`<div class="task">${t.nombre} <button onclick="delRec(${i})">✕</button></div>`).join("")
+
+listaNr.innerHTML=nr.map((t,i)=>`<div class="task">${t.nombre} <button onclick="delNr(${i})">✕</button></div>`).join("")
+
+listaFest.innerHTML=festExtra.map((f,i)=>`<div class="task">${f.n} <button onclick="delFest(${i})">✕</button></div>`).join("")
+
+}
+
+function delRec(i){rec.splice(i,1);generar()}
+function delNr(i){nr.splice(i,1);generar()}
+function delFest(i){festExtra.splice(i,1);generar()}
+
+addRec.onclick=()=>{
+rec.push({nombre:recNombre.value,inicio:+recInicio.value,dur:+recDur.value})
+generar()
+}
+
+addNr.onclick=()=>{
+nr.push({nombre:nrNombre.value,inicio:+nrInicio.value,dur:+nrDur.value})
+generar()
+}
+
+addFest.onclick=()=>{
+festExtra.push({n:festNombre.value,d:+festDia.value,m:mes})
+generar()
+}
+
+prev.onclick=()=>{
+mes--
+if(mes<0){mes=11;anio--}
+generar()
+}
+
+next.onclick=()=>{
+mes++
+if(mes>11){mes=0;anio++}
+generar()
+}
+
+today.onclick=()=>{
+let d=new Date()
+mes=d.getMonth()
+anio=d.getFullYear()
+generar()
+}
+
+generar()
+
+</script>
+
+</body>
+</html>
