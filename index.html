@@ -3,16 +3,12 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Calendario Perpetuo Pro - México</title>
+    <title>Calendario Planificador Pro - México</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
     <style>
         :root {
-            --bg: #0e0e14;
-            --surface: #16161f;
-            --border: #2a2a3d;
-            --gold: #c9a84c;
-            --white: #f0ede6;
-            --muted: #6b6b8a;
-            --holiday-text: #e05c6a;
+            --bg: #0e0e14; --surface: #16161f; --border: #2a2a3d; --gold: #c9a84c;
+            --white: #f0ede6; --muted: #6b6b8a; --holiday-text: #e05c6a; --del-btn: #ff4d4d;
         }
 
         body { background: var(--bg); color: var(--white); font-family: 'DM Sans', sans-serif; margin: 0; padding: 20px; }
@@ -23,13 +19,20 @@
             margin-bottom: 20px; border-bottom: 2px solid var(--gold); padding-bottom: 10px;
         }
 
+        .actions-bar { display: flex; gap: 8px; flex-wrap: wrap; }
+
         select, input, button {
             background: var(--surface); color: var(--white); border: 1px solid var(--border);
-            padding: 8px; border-radius: 4px; outline: none;
+            padding: 8px; border-radius: 4px; outline: none; font-size: 0.9em;
         }
 
         button { background: var(--gold); color: var(--bg); font-weight: bold; cursor: pointer; transition: 0.3s; }
         button:hover { opacity: 0.8; }
+        .btn-pdf { background: #e05c6a; color: white; border: none; }
+        .btn-secondary { background: transparent; color: var(--gold); border: 1px solid var(--gold); }
+        .btn-del { background: transparent; color: var(--del-btn); border: none; padding: 2px 5px; font-size: 1.2em; }
+
+        #pdf-area { background: var(--bg); padding: 10px; border-radius: 8px; }
 
         .calendar-grid {
             display: grid; grid-template-columns: repeat(7, 1fr);
@@ -37,90 +40,91 @@
         }
 
         .day-header { background: var(--surface); padding: 10px; text-align: center; font-weight: bold; color: var(--gold); }
-        .day-cell { background: var(--bg); min-height: 110px; padding: 5px; position: relative; overflow-y: auto; }
+        .day-cell { background: var(--bg); min-height: 110px; padding: 5px; position: relative; }
 
         .day-num { font-size: 0.85em; margin-bottom: 5px; display: block; }
         .is-weekend { background: #15151d; }
-        .is-holiday-label { color: var(--holiday-text); font-weight: bold; font-size: 0.7em; display: block; margin-top: 2px; }
+        .is-holiday-label { color: var(--holiday-text); font-weight: bold; font-size: 0.65em; display: block; }
 
-        /* Estilo Gantt */
         .gantt-item {
-            font-size: 0.7em; padding: 3px 6px; margin-bottom: 2px;
-            border-radius: 4px; white-space: nowrap; overflow: hidden;
-            text-overflow: ellipsis; color: #fff; text-shadow: 1px 1px 2px rgba(0,0,0,0.5);
-            font-weight: 500;
+            font-size: 0.65em; padding: 2px 5px; margin-bottom: 2px;
+            border-radius: 3px; white-space: nowrap; overflow: hidden;
+            text-overflow: ellipsis; color: #fff; font-weight: 500;
         }
 
         .data-sections {
             margin-top: 30px; display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 20px;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 20px;
         }
 
-        .section-card { background: var(--surface); padding: 20px; border-radius: 12px; border: 1px solid var(--border); }
-        .section-card h3 { color: var(--gold); margin-top: 0; font-size: 1em; border-bottom: 1px solid var(--border); padding-bottom: 10px;}
+        .section-card { background: var(--surface); padding: 15px; border-radius: 12px; border: 1px solid var(--border); }
+        .section-card h3 { color: var(--gold); margin-top: 0; font-size: 0.95em; border-bottom: 1px solid var(--border); padding-bottom: 8px;}
         
-        .form-group { display: flex; flex-direction: column; gap: 8px; margin-bottom: 15px; }
-        .form-group label { font-size: 0.75em; color: var(--muted); text-transform: uppercase; }
-
         table { width: 100%; font-size: 0.75em; border-collapse: collapse; margin-top: 10px; }
-        th { text-align: left; color: var(--gold); padding: 5px; }
+        th { text-align: left; color: var(--gold); border-bottom: 1px solid var(--border); padding: 5px; }
         td { padding: 5px; border-bottom: 1px solid #222; }
+
+        #fileInput { display: none; }
     </style>
 </head>
 <body>
 
 <div class="container">
     <header>
-        <h2>📅 Calendario Planificador</h2>
-        <div>
+        <h2>📅 Planificador Mensual</h2>
+        <div class="actions-bar">
+            <button class="btn-pdf" onclick="exportToPDF()">📄 PDF</button>
+            <button class="btn-secondary" onclick="exportData()">💾 JSON</button>
+            <button class="btn-secondary" onclick="document.getElementById('fileInput').click()">📂 Cargar</button>
+            <input type="file" id="fileInput" onchange="importData(event)" accept=".json">
             <select id="monthSel" onchange="renderCalendar()"></select>
-            <input type="number" id="yearSel" value="2024" style="width: 85px;" onchange="renderCalendar()">
-            <button onclick="renderCalendar()">Actualizar</button>
+            <input type="number" id="yearSel" value="2026" style="width: 75px;" onchange="renderCalendar()">
         </div>
     </header>
 
-    <div id="calendar" class="calendar-grid"></div>
+    <div id="pdf-area">
+        <h3 id="pdf-title" style="color: var(--gold); margin-bottom: 10px; display: none; text-align: center;">Plan de Trabajo</h3>
+        <div id="calendar" class="calendar-grid"></div>
+    </div>
 
     <div class="data-sections">
         <div class="section-card">
-            <h3>🔄 Tareas Recurrentes (Hábiles)</h3>
-            <div class="form-group">
-                <input type="text" id="recName" placeholder="Nombre de tarea">
-                <div style="display:flex; gap:10px">
-                    <div style="flex:1"><label>Inicia Hábil #</label><input type="number" id="recStart" value="1" style="width:100%"></div>
-                    <div style="flex:1"><label>Duración Días</label><input type="number" id="recDuration" value="1" style="width:100%"></div>
+            <h3>🔄 Tareas Recurrentes (Días Hábiles)</h3>
+            <div style="display:flex; flex-direction:column; gap:8px;">
+                <input type="text" id="recName" placeholder="Nombre tarea">
+                <div style="display:flex; gap:5px;">
+                    <input type="number" id="recStart" placeholder="Inicia Hábil #" style="width:50%">
+                    <input type="number" id="recDuration" placeholder="Días" style="width:50%">
                 </div>
-                <button onclick="addRec()">+ Agregar Tarea</button>
+                <button onclick="addRec()">+ Agregar</button>
             </div>
-            <table id="tableRec"><thead><tr><th>Tarea</th><th>Inicio</th><th>Dur</th></tr></thead><tbody></tbody></table>
+            <table id="tableRec"><thead><tr><th>Tarea</th><th>Ini</th><th>Dur</th><th></th></tr></thead><tbody></tbody></table>
         </div>
 
         <div class="section-card">
-            <h3>📍 Tareas Específicas (Fecha)</h3>
-            <div class="form-group">
-                <input type="text" id="nonRecName" placeholder="Nombre de tarea">
-                <div style="display:flex; gap:10px">
-                    <div style="flex:1"><label>Día del mes</label><input type="number" id="nonRecDay" value="1" style="width:100%"></div>
-                    <div style="flex:1"><label>Duración</label><input type="number" id="nonRecDuration" value="1" style="width:100%"></div>
+            <h3>📍 Tareas Específicas (Fecha Fija)</h3>
+            <div style="display:flex; flex-direction:column; gap:8px;">
+                <input type="text" id="nonRecName" placeholder="Nombre tarea">
+                <div style="display:flex; gap:5px;">
+                    <input type="number" id="nonRecDay" placeholder="Día" style="width:50%">
+                    <input type="number" id="nonRecDuration" placeholder="Días" style="width:50%">
                 </div>
-                <button onclick="addNonRec()">+ Agregar Tarea</button>
+                <button onclick="addNonRec()">+ Agregar</button>
             </div>
-            <table id="tableNonRec"><thead><tr><th>Tarea</th><th>Día</th><th>Dur</th></tr></thead><tbody></tbody></table>
+            <table id="tableNonRec"><thead><tr><th>Tarea</th><th>Día</th><th>Dur</th><th></th></tr></thead><tbody></tbody></table>
         </div>
 
         <div class="section-card">
-            <h3>🇲🇽 Días Festivos y Asuetos</h3>
-            <div class="form-group">
-                <input type="text" id="holName" placeholder="Ej. Cumpleaños">
-                <div style="display:flex; gap:10px">
-                    <div style="flex:1"><label>Mes</label>
-                        <select id="holMonth" style="width:100%"></select>
-                    </div>
-                    <div style="flex:1"><label>Día</label><input type="number" id="holDay" value="1" style="width:100%"></div>
+            <h3>🇲🇽 Festivos y Asuetos</h3>
+            <div style="display:flex; flex-direction:column; gap:8px;">
+                <input type="text" id="holName" placeholder="Descripción">
+                <div style="display:flex; gap:5px;">
+                    <select id="holMonth" style="width:60%"></select>
+                    <input type="number" id="holDay" placeholder="Día" style="width:40%">
                 </div>
-                <button onclick="addHoliday()">+ Agregar Festivo</button>
+                <button onclick="addHoliday()">+ Agregar</button>
             </div>
-            <table id="tableHol"><thead><tr><th>Desc.</th><th>Mes</th><th>Día</th></tr></thead><tbody></tbody></table>
+            <table id="tableHol"><thead><tr><th>Desc.</th><th>Mes</th><th>Día</th><th></th></tr></thead><tbody></tbody></table>
         </div>
     </div>
 </div>
@@ -128,20 +132,28 @@
 <script>
     const months = ["Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio", "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre"];
     const daysArr = ["Lun", "Mar", "Mié", "Jue", "Vie", "Sáb", "Dom"];
-    const colors = ["#4caf7d", "#c9a84c", "#4c8dc9", "#a34cc9", "#c94c4c", "#4cc9c9", "#e67e22", "#9b59b6", "#34495e"];
+    const colors = ["#4caf7d", "#c9a84c", "#4c8dc9", "#a34cc9", "#c94c4c", "#4cc9c9", "#e67e22", "#9b59b6"];
 
     let dataRec = [];
     let dataNonRec = [];
     let dataHolidays = [
         { name: "Año Nuevo", month: 0, day: 1 },
-        { name: "Constitución (Asueto)", month: 1, day: 5, shift: true }, // Se recorre al 1er lunes
-        { name: "Benito Juárez", month: 2, day: 21, shift: true }, // Se recorre al 3er lunes
+        { name: "Constitución", month: 1, day: 5, shift: true },
+        { name: "Benito Juárez", month: 2, day: 21, shift: true },
         { name: "Día del Trabajo", month: 4, day: 1 },
         { name: "Independencia", month: 8, day: 16 },
-        { name: "Revolución", month: 10, day: 20, shift: true }, // Se recorre al 3er lunes
-        { name: "Transmisión Poder", month: 9, day: 1 }, // Solo cada 6 años (ej. 2024)
+        { name: "Día de Muertos", month: 10, day: 2 },
+        { name: "Revolución", month: 10, day: 20, shift: true },
+        { name: "Día Empleado Bancario", month: 11, day: 12 },
         { name: "Navidad", month: 11, day: 25 }
     ];
+
+    function getEaster(year) {
+        var f = Math.floor, G = year % 19, C = f(year / 100), H = (C - f(C / 4) - f((8 * C + 13) / 25) + 19 * G + 15) % 30,
+            I = H - f(H / 28) * (1 - f(28 / (H + 1)) * f((21 - G) / 11)), J = (year + f(year / 4) + I + 2 - C + f(C / 4)) % 7,
+            L = I - J, month = 3 + f((L + 40) / 44), day = L + 28 - 31 * f(month / 4);
+        return new Date(year, month - 1, day);
+    }
 
     window.onload = () => {
         const mSel = document.getElementById('monthSel');
@@ -155,40 +167,39 @@
     };
 
     function addRec() {
-        const color = colors[dataRec.length % colors.length];
-        dataRec.push({ name: document.getElementById('recName').value, start: parseInt(document.getElementById('recStart').value), dur: parseInt(document.getElementById('recDuration').value), color });
+        dataRec.push({ name: document.getElementById('recName').value, start: parseInt(document.getElementById('recStart').value), dur: parseInt(document.getElementById('recDuration').value), color: colors[dataRec.length % colors.length] });
         renderCalendar();
     }
-
     function addNonRec() {
-        const color = colors[(dataRec.length + dataNonRec.length) % colors.length];
-        dataNonRec.push({ name: document.getElementById('nonRecName').value, day: parseInt(document.getElementById('nonRecDay').value), dur: parseInt(document.getElementById('nonRecDuration').value), color });
+        dataNonRec.push({ name: document.getElementById('nonRecName').value, day: parseInt(document.getElementById('nonRecDay').value), dur: parseInt(document.getElementById('nonRecDuration').value), color: colors[(dataRec.length + dataNonRec.length) % colors.length] });
         renderCalendar();
     }
-
     function addHoliday() {
         dataHolidays.push({ name: document.getElementById('holName').value, month: parseInt(document.getElementById('holMonth').value), day: parseInt(document.getElementById('holDay').value) });
         renderCalendar();
     }
 
-    // Lógica para determinar si un día es festivo oficial en México (incluyendo los que se recorren)
+    function removeRec(idx) { dataRec.splice(idx, 1); renderCalendar(); }
+    function removeNonRec(idx) { dataNonRec.splice(idx, 1); renderCalendar(); }
+    function removeHol(idx) { dataHolidays.splice(idx, 1); renderCalendar(); }
+
     function getHolidaysForMonth(year, month) {
         let currentHolidays = [];
+        // Semana Santa
+        let easter = getEaster(year);
+        let thu = new Date(easter); thu.setDate(easter.getDate() - 3);
+        let fri = new Date(easter); fri.setDate(easter.getDate() - 2);
+        if(thu.getMonth() === month) currentHolidays.push({day: thu.getDate(), name: "Jueves Santo"});
+        if(fri.getMonth() === month) currentHolidays.push({day: fri.getDate(), name: "Viernes Santo"});
+
         dataHolidays.forEach(h => {
             if (h.month === month) {
                 let actualDay = h.day;
-                // Lógica de la LFT México para recorrer días
                 if (h.shift) {
                     let d = new Date(year, month, 1);
-                    if (h.month === 1) { // 1er lunes de febrero
-                        while(d.getDay() !== 1) d.setDate(d.getDate() + 1);
-                        actualDay = d.getDate();
-                    } else if (h.month === 2 || h.month === 10) { // 3er lunes de marzo o nov
-                        let count = 0;
-                        while(count < 3) {
-                            if(d.getDay() === 1) count++;
-                            if(count < 3) d.setDate(d.getDate() + 1);
-                        }
+                    if (h.month === 1) { while(d.getDay() !== 1) d.setDate(d.getDate() + 1); actualDay = d.getDate(); }
+                    else if (h.month === 2 || h.month === 10) {
+                        let count = 0; while(count < 3) { if(d.getDay() === 1) count++; if(count < 3) d.setDate(d.getDate() + 1); }
                         actualDay = d.getDate();
                     }
                 }
@@ -203,7 +214,6 @@
         const year = parseInt(document.getElementById('yearSel').value);
         const container = document.getElementById('calendar');
         container.innerHTML = "";
-
         daysArr.forEach(d => container.innerHTML += `<div class="day-header">${d}</div>`);
 
         const firstDay = new Date(year, month, 1).getDay();
@@ -213,45 +223,27 @@
         for(let i=0; i<offset; i++) container.innerHTML += `<div class="day-cell"></div>`;
 
         const monthHolidays = getHolidaysForMonth(year, month);
-        
-        // Identificar días hábiles
-        let businessDays = [];
+        let bDays = [];
         for(let d=1; d<=daysInMonth; d++) {
             let dt = new Date(year, month, d);
-            let isWknd = (dt.getDay() === 0 || dt.getDay() === 6);
-            let isHol = monthHolidays.some(h => h.day === d);
-            if(!isWknd && !isHol) businessDays.push(d);
+            if(dt.getDay() !== 0 && dt.getDay() !== 6 && !monthHolidays.some(h=>h.day===d)) bDays.push(d);
         }
 
-        // Crear celdas
         for(let d=1; d<=daysInMonth; d++) {
             let dt = new Date(year, month, d);
-            let isWknd = (dt.getDay() === 0 || dt.getDay() === 6);
             let hol = monthHolidays.find(h => h.day === d);
-            
-            container.innerHTML += `
-                <div class="day-cell ${isWknd?'is-weekend':''}" id="day-${d}">
-                    <span class="day-num">${d}</span>
-                    ${hol ? `<span class="is-holiday-label">${hol.name}</span>` : ''}
-                    <div id="tasks-${d}"></div>
-                </div>`;
+            container.innerHTML += `<div class="day-cell ${(dt.getDay()===0||dt.getDay()===6)?'is-weekend':''}" id="day-${d}"><span class="day-num">${d}</span>${hol ? `<span class="is-holiday-label">${hol.name}</span>` : ''}<div id="tasks-${d}"></div></div>`;
         }
 
-        // Dibujar tareas recurrentes
         dataRec.forEach(t => {
-            let startIdx = t.start - 1;
             for(let i=0; i<t.dur; i++) {
-                let dayNum = businessDays[startIdx + i];
-                if(dayNum) drawTask(dayNum, t.name, t.color);
+                let d = bDays[t.start - 1 + i];
+                if(d) drawTask(d, t.name, t.color);
             }
         });
 
-        // Dibujar tareas no recurrentes
         dataNonRec.forEach(t => {
-            for(let i=0; i<t.dur; i++) {
-                let d = t.day + i;
-                if(d <= daysInMonth) drawTask(d, t.name, t.color);
-            }
+            for(let i=0; i<t.dur; i++) { if(t.day+i <= daysInMonth) drawTask(t.day+i, t.name, t.color); }
         });
 
         updateTables();
@@ -263,9 +255,28 @@
     }
 
     function updateTables() {
-        document.querySelector('#tableRec tbody').innerHTML = dataRec.map(d => `<tr><td><span style="color:${d.color}">●</span> ${d.name}</td><td>${d.start}</td><td>${d.dur}</td></tr>`).join('');
-        document.querySelector('#tableNonRec tbody').innerHTML = dataNonRec.map(d => `<tr><td><span style="color:${d.color}">●</span> ${d.name}</td><td>${d.day}</td><td>${d.dur}</td></tr>`).join('');
-        document.querySelector('#tableHol tbody').innerHTML = dataHolidays.map(d => `<tr><td>${d.name}</td><td>${months[d.month]}</td><td>${d.day}</td></tr>`).join('');
+        document.querySelector('#tableRec tbody').innerHTML = dataRec.map((d, i) => `<tr><td><span style="color:${d.color}">●</span> ${d.name}</td><td>${d.start}</td><td>${d.dur}</td><td><button class="btn-del" onclick="removeRec(${i})">×</button></td></tr>`).join('');
+        document.querySelector('#tableNonRec tbody').innerHTML = dataNonRec.map((d, i) => `<tr><td><span style="color:${d.color}">●</span> ${d.name}</td><td>${d.day}</td><td>${d.dur}</td><td><button class="btn-del" onclick="removeNonRec(${i})">×</button></td></tr>`).join('');
+        document.querySelector('#tableHol tbody').innerHTML = dataHolidays.map((d, i) => `<tr><td>${d.name}</td><td>${months[d.month]}</td><td>${d.day}</td><td><button class="btn-del" onclick="removeHol(${i})">×</button></td></tr>`).join('');
+    }
+
+    function exportToPDF() {
+        const element = document.getElementById('pdf-area');
+        const title = document.getElementById('pdf-title');
+        title.innerText = `PLAN: ${months[document.getElementById('monthSel').value].toUpperCase()} ${document.getElementById('yearSel').value}`;
+        title.style.display = 'block';
+        html2pdf().set({ margin: 10, filename: 'Plan.pdf', html2canvas: { scale: 2, backgroundColor: '#0e0e14' }, jsPDF: { format: 'a4', orientation: 'landscape' } }).from(element).save().then(()=>title.style.display='none');
+    }
+
+    function exportData() {
+        const blob = new Blob([JSON.stringify({ dataRec, dataNonRec, dataHolidays })], { type: "application/json" });
+        const a = document.createElement("a"); a.href = URL.createObjectURL(blob); a.download = `plan.json`; a.click();
+    }
+
+    function importData(e) {
+        const reader = new FileReader();
+        reader.onload = (ev) => { const imp = JSON.parse(ev.target.result); dataRec=imp.dataRec||[]; dataNonRec=imp.nonRec||[]; dataHolidays=imp.dataHolidays||[]; renderCalendar(); };
+        reader.readAsText(e.target.files[0]);
     }
 </script>
 </body>
